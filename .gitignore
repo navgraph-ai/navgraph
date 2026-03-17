@@ -47,3 +47,21 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.replit
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+
+# NavGraph runtime files
+navgraph.manifest.json
+navgraph.corpus.jsonl
+manifest.json
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
