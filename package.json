@@ -1,7 +1,7 @@
 {
   "name": "navgraph",
   "version": "1.0.0",
-  "description": "AI Capability Manifest Engine",
+  "description": "AI Capability Manifest Engine — built on capman by Marcus, extended by NavGraph",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -9,11 +9,15 @@
   },
   "scripts": {
     "build":    "tsc",
-    "test":     "ts-node test/test-navgraph.ts",
+    "test":     "npx ts-node test/test-navgraph.ts",
+    "lint":     "tsc --noEmit",
+    "generate": "node bin/navgraph.js generate",
     "validate": "node bin/navgraph.js validate",
     "inspect":  "node bin/navgraph.js inspect"
   },
+  "keywords": ["ai", "agents", "capability", "manifest", "navgraph", "llm", "rag"],
   "license": "MIT",
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.4.0",
     "ts-node":    "^10.9.0",
