@@ -1,6 +1,6 @@
 import type { Capability, Manifest, MatchResult } from './types'
 
-const KEYWORD_THRESHOLD = 50
+const KEYWORD_THRESHOLD = 45
 const MIN_CONFIDENCE    = 25
 
 function tokenize(text: string): string[] {

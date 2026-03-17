@@ -1,0 +1,14 @@
+{
+  "name": "navgraph",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "tsx test/test-navgraph.ts",
+    "build": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.2"
+  }
+}
