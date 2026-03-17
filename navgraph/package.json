@@ -1,10 +1,39 @@
 {
   "name": "navgraph",
   "version": "0.1.0",
-  "private": true,
+  "description": "AI Capability Manifest Engine — define, match, resolve and monitor app capabilities for AI agents",
+  "keywords": [
+    "ai",
+    "navigation",
+    "manifest",
+    "capability",
+    "intent",
+    "llm",
+    "agent",
+    "deep-link",
+    "routing"
+  ],
+  "license": "MIT",
+  "author": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "navgraph": "./bin/navgraph.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "test": "tsx test/test-navgraph.ts",
-    "build": "tsc --noEmit"
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
