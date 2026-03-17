@@ -58,13 +58,20 @@ function requireSrc() {
   const distPath = path.join(__dirname, '..', 'dist', 'index.js')
   if (fs.existsSync(distPath)) return require(distPath)
 
+  // Try tsx (preferred, already a devDependency)
+  try {
+    require('tsx/cjs')
+    return require(path.join(__dirname, '..', 'src', 'index.ts'))
+  } catch {}
+
+  // Try ts-node fallback
   try {
     require('ts-node/register')
     return require(path.join(__dirname, '..', 'src', 'index.ts'))
-  } catch {
-    log.error('Cannot find dist/index.js — run: npx tsc')
-    process.exit(1)
-  }
+  } catch {}
+
+  log.error('Cannot load source. Run: npm run build')
+  process.exit(1)
 }
 
 // ─── init ─────────────────────────────────────────────────────────────────────
@@ -148,7 +155,8 @@ async function cmdEnrich() {
 
   const { readManifest, enrich, writeManifest, validate } = requireSrc()
 
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
+  const apiKey     = process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
+  const baseUrlEnv = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL
   if (!apiKey) {
     log.error('No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.')
     process.exit(1)
@@ -173,22 +181,25 @@ async function cmdEnrich() {
 
   // Build LLM function — try Anthropic first, then OpenAI
   let llm
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
+    const anthropicKey  = process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY
+    const anthropicBase = baseUrlEnv ?? 'https://api.anthropic.com'
     llm = async (prompt) => {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch(`${anthropicBase}/v1/messages`, {
         method:  'POST',
         headers: {
           'Content-Type':      'application/json',
-          'x-api-key':         process.env.ANTHROPIC_API_KEY,
+          'x-api-key':         anthropicKey,
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model:      'claude-sonnet-4-20250514',
+          model:      'claude-haiku-4-5',
           max_tokens: 500,
           messages:   [{ role: 'user', content: prompt }],
         }),
       })
       const data = await res.json()
+      if (data.error) throw new Error(data.error.message)
       return data.content[0].text
     }
   } else {
