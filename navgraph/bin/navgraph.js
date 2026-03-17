@@ -58,20 +58,13 @@ function requireSrc() {
   const distPath = path.join(__dirname, '..', 'dist', 'index.js')
   if (fs.existsSync(distPath)) return require(distPath)
 
-  // Try tsx (preferred, already a devDependency)
-  try {
-    require('tsx/cjs')
-    return require(path.join(__dirname, '..', 'src', 'index.ts'))
-  } catch {}
-
-  // Try ts-node fallback
   try {
     require('ts-node/register')
     return require(path.join(__dirname, '..', 'src', 'index.ts'))
-  } catch {}
-
-  log.error('Cannot load source. Run: npm run build')
-  process.exit(1)
+  } catch {
+    log.error('Cannot find dist/index.js — run: npx tsc')
+    process.exit(1)
+  }
 }
 
 // ─── init ─────────────────────────────────────────────────────────────────────
