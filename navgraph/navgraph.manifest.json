@@ -1,0 +1,41 @@
+{
+  "version": "1.0.0",
+  "app": "your-app-name",
+  "generatedAt": "2026-03-17T10:02:18.525Z",
+  "capabilities": [
+    {
+      "id": "get_resource",
+      "name": "Get a resource",
+      "description": "Fetch a specific resource by name or ID.",
+      "examples": [
+        "Show me the resource details",
+        "Find resource by ID",
+        "Look up resource by name"
+      ],
+      "params": [
+        {
+          "name": "resource_id",
+          "description": "Resource ID",
+          "required": true,
+          "source": "user_query"
+        }
+      ],
+      "returns": [
+        "resource"
+      ],
+      "resolver": {
+        "type": "api",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/resources/{resource_id}"
+          }
+        ]
+      },
+      "privacy": {
+        "level": "public"
+      }
+    }
+  ],
+  "contentHash": "74526e2e45133826"
+}
