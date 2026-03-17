@@ -288,7 +288,7 @@ test('user_owned capability without auth token is rejected', async () => {
   // No authToken provided
   const result = await resolve(matchResult, {}, { baseUrl: 'https://api.conduit.io', dryRun: true })
   assert(!result.success, 'Should fail without auth token')
-  assert(result.error?.includes('user_owned') || result.error?.includes('authentication'), `Unexpected error: ${result.error}`)
+  assert(!!(result.error?.includes('user_owned') || result.error?.includes('authentication')), `Unexpected error: ${result.error}`)
 })
 
 test('user_owned capability with auth token succeeds', async () => {

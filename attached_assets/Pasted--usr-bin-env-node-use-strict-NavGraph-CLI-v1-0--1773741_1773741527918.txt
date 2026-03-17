@@ -1,0 +1,471 @@
+#!/usr/bin/env node
+'use strict'
+
+// ─── NavGraph CLI v1.0 ────────────────────────────────────────────────────────
+// Commands:
+//   init       Create a starter navgraph.config.js
+//   generate   Generate navgraph.manifest.json from config
+//   enrich     Run AI enrichment pipeline over the manifest
+//   validate   Validate the manifest for errors and warnings
+//   inspect    Pretty-print all capabilities in the manifest
+//   diff       Compare two manifest versions and report drift
+//   corpus     Analyse the query corpus for patterns and gaps
+
+const path = require('path')
+const fs   = require('fs')
+
+const args    = process.argv.slice(2)
+const command = args[0]
+const flags   = args.slice(1)
+
+const getFlag  = (name) => { const i = flags.indexOf(name); return i !== -1 ? flags[i + 1] : undefined }
+const hasFlag  = (name) => flags.includes(name)
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+
+const c = {
+  reset:   '\x1b[0m',
+  bold:    '\x1b[1m',
+  dim:     '\x1b[2m',
+  teal:    '\x1b[36m',
+  yellow:  '\x1b[33m',
+  red:     '\x1b[31m',
+  green:   '\x1b[32m',
+  gray:    '\x1b[90m',
+  magenta: '\x1b[35m',
+}
+
+const log = {
+  info:    (...a) => console.log(`  ${c.teal}i${c.reset}`, ...a),
+  success: (...a) => console.log(`  ${c.green}✓${c.reset}`, ...a),
+  warn:    (...a) => console.log(`  ${c.yellow}⚠${c.reset}`, ...a),
+  error:   (...a) => console.error(`  ${c.red}✗${c.reset}`, ...a),
+  blank:   ()     => console.log(),
+  line:    ()     => console.log(`  ${c.gray}${'─'.repeat(50)}${c.reset}`),
+}
+
+function header(sub = '') {
+  console.log()
+  console.log(`  ${c.bold}${c.teal}navgraph${c.reset}  ${c.gray}v1.0.0 — AI Capability Manifest Engine${c.reset}`)
+  if (sub) console.log(`  ${c.gray}${sub}${c.reset}`)
+  log.line()
+  console.log()
+}
+
+// ─── Source Loader ────────────────────────────────────────────────────────────
+
+function requireSrc() {
+  const distPath = path.join(__dirname, '..', 'dist', 'index.js')
+  if (fs.existsSync(distPath)) return require(distPath)
+
+  try {
+    require('ts-node/register')
+    return require(path.join(__dirname, '..', 'src', 'index.ts'))
+  } catch {
+    log.error('Cannot find dist/index.js — run: npx tsc')
+    process.exit(1)
+  }
+}
+
+// ─── init ─────────────────────────────────────────────────────────────────────
+
+function cmdInit() {
+  header('init — Create a starter config')
+
+  const outPath = path.resolve(process.cwd(), 'navgraph.config.js')
+
+  if (fs.existsSync(outPath)) {
+    log.warn(`navgraph.config.js already exists — not overwriting.`)
+    log.info(`Edit it, then run: npx navgraph generate`)
+    console.log()
+    process.exit(0)
+  }
+
+  const { generateStarterConfig } = requireSrc()
+  fs.writeFileSync(outPath, generateStarterConfig())
+
+  log.success(`Created ${c.bold}navgraph.config.js${c.reset}`)
+  log.blank()
+  log.info(`Next steps:`)
+  console.log(`    1. Edit navgraph.config.js with your app's capabilities`)
+  console.log(`    2. Run: npx navgraph generate`)
+  console.log(`    3. Run: npx navgraph enrich     (optional — adds AI intent labels)`)
+  console.log(`    4. Run: npx navgraph validate`)
+  console.log()
+}
+
+// ─── generate ─────────────────────────────────────────────────────────────────
+
+function cmdGenerate() {
+  header('generate — Build manifest from config')
+
+  const { loadConfig, generate, writeManifest, validate } = requireSrc()
+
+  const configPath = getFlag('--config')
+  const outPath    = getFlag('--out') ?? 'navgraph.manifest.json'
+
+  log.info('Loading config...')
+  let config
+  try {
+    config = loadConfig(configPath)
+  } catch (e) {
+    log.error(e.message)
+    process.exit(1)
+  }
+
+  log.info(`Building manifest for ${c.bold}${config.app}${c.reset}...`)
+  const manifest = generate(config)
+  const result   = validate(manifest)
+
+  log.blank()
+
+  for (const w of result.warnings) log.warn(w)
+  for (const e of result.errors)   log.error(e)
+
+  if (!result.valid) {
+    log.blank()
+    log.error('Manifest has errors — fix them before writing.')
+    process.exit(1)
+  }
+
+  const written = writeManifest(manifest, outPath)
+  log.blank()
+  log.success(`Manifest written → ${c.bold}${path.basename(written)}${c.reset}`)
+  log.info(`${manifest.capabilities.length} capabilities registered`)
+  log.info(`Content hash: ${c.gray}${manifest.contentHash}${c.reset}`)
+
+  if (result.warnings.length > 0) {
+    log.blank()
+    log.info(`${result.warnings.length} warning(s) above — run ${c.bold}npx navgraph enrich${c.reset} to improve match quality`)
+  }
+  console.log()
+}
+
+// ─── enrich ───────────────────────────────────────────────────────────────────
+
+async function cmdEnrich() {
+  header('enrich — Add AI intent labels to manifest')
+
+  const { readManifest, enrich, writeManifest, validate } = requireSrc()
+
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    log.error('No API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.')
+    process.exit(1)
+  }
+
+  const manifestPath = getFlag('--manifest') ?? 'navgraph.manifest.json'
+  const outPath      = getFlag('--out') ?? manifestPath
+  const skipIf       = parseInt(getFlag('--skip-if-confident') ?? '85', 10)
+  const verbose      = hasFlag('--verbose')
+
+  let manifest
+  try {
+    manifest = readManifest(manifestPath)
+  } catch (e) {
+    log.error(e.message)
+    process.exit(1)
+  }
+
+  log.info(`Enriching ${manifest.capabilities.length} capabilities for ${c.bold}${manifest.app}${c.reset}...`)
+  log.info(`Skip threshold: ${skipIf}% (capabilities with higher confidence will be skipped)`)
+  log.blank()
+
+  // Build LLM function — try Anthropic first, then OpenAI
+  let llm
+  if (process.env.ANTHROPIC_API_KEY) {
+    llm = async (prompt) => {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:  'POST',
+        headers: {
+          'Content-Type':      'application/json',
+          'x-api-key':         process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model:      'claude-sonnet-4-20250514',
+          max_tokens: 500,
+          messages:   [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await res.json()
+      return data.content[0].text
+    }
+  } else {
+    llm = async (prompt) => {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model:      'gpt-4o-mini',
+          max_tokens: 500,
+          messages:   [{ role: 'user', content: prompt }],
+        }),
+      })
+      const data = await res.json()
+      return data.choices[0].message.content
+    }
+  }
+
+  try {
+    const enriched = await enrich(manifest, llm, { skipIfConfident: skipIf, verbose })
+    const written  = writeManifest(enriched, outPath)
+
+    log.blank()
+    const enrichedCount = enriched.capabilities.filter(c => c.enrichment).length
+    log.success(`Enrichment complete → ${c.bold}${path.basename(written)}${c.reset}`)
+    log.info(`${enrichedCount}/${enriched.capabilities.length} capabilities enriched`)
+    log.blank()
+    log.warn(`Enrichments have not been human-approved yet.`)
+    log.info(`Review with: npx navgraph inspect --show-enrichment`)
+    log.info(`Approve all: npx navgraph approve --all`)
+  } catch (e) {
+    log.error('Enrichment failed:', e.message)
+    process.exit(1)
+  }
+  console.log()
+}
+
+// ─── validate ─────────────────────────────────────────────────────────────────
+
+function cmdValidate() {
+  header('validate — Check manifest for errors')
+
+  const { readManifest, validate } = requireSrc()
+
+  const manifestPath = getFlag('--manifest') ?? 'navgraph.manifest.json'
+  let manifest
+  try {
+    manifest = readManifest(manifestPath)
+  } catch (e) {
+    log.error(e.message)
+    process.exit(1)
+  }
+
+  log.info(`Validating ${c.bold}${path.basename(manifestPath)}${c.reset}  (${manifest.app})`)
+  log.blank()
+
+  const result = validate(manifest)
+
+  if (result.warnings.length > 0) {
+    for (const w of result.warnings) log.warn(w)
+    log.blank()
+  }
+
+  for (const e of result.errors) log.error(e)
+
+  if (result.valid) {
+    log.success(`${manifest.capabilities.length} capabilities — all valid`)
+    if (result.warnings.length > 0)
+      log.info(`${result.warnings.length} warning(s) above — not errors, but worth addressing`)
+  } else {
+    log.blank()
+    log.error(`${result.errors.length} error(s) found. Fix before deploying.`)
+    process.exit(1)
+  }
+  console.log()
+}
+
+// ─── inspect ──────────────────────────────────────────────────────────────────
+
+function cmdInspect() {
+  header('inspect — Browse all capabilities')
+
+  const { readManifest } = requireSrc()
+
+  const manifestPath    = getFlag('--manifest') ?? 'navgraph.manifest.json'
+  const showEnrichment  = hasFlag('--show-enrichment')
+
+  let manifest
+  try {
+    manifest = readManifest(manifestPath)
+  } catch (e) {
+    log.error(e.message)
+    process.exit(1)
+  }
+
+  console.log(`  ${c.bold}App:${c.reset}          ${manifest.app}`)
+  console.log(`  ${c.bold}Generated:${c.reset}    ${manifest.generatedAt}`)
+  if (manifest.enrichedAt)
+    console.log(`  ${c.bold}Enriched:${c.reset}     ${manifest.enrichedAt}`)
+  console.log(`  ${c.bold}Hash:${c.reset}         ${c.gray}${manifest.contentHash ?? 'n/a'}${c.reset}`)
+  console.log(`  ${c.bold}Capabilities:${c.reset} ${manifest.capabilities.length}`)
+  log.blank()
+  log.line()
+  log.blank()
+
+  for (const cap of manifest.capabilities) {
+    const rtColor = cap.resolver.type === 'hybrid' ? c.magenta : c.teal
+    const pvColor = cap.privacy.level === 'admin' ? c.red : cap.privacy.level === 'user_owned' ? c.yellow : c.green
+
+    console.log(`  ${c.bold}${cap.name}${c.reset}`)
+    console.log(`  ${c.gray}id:${c.reset} ${cap.id}  ${rtColor}[${cap.resolver.type}]${c.reset}  ${pvColor}${cap.privacy.level}${c.reset}`)
+    console.log(`  ${cap.description}`)
+
+    if (cap.examples?.length)
+      console.log(`  ${c.gray}e.g. "${cap.examples[0]}"${cap.examples.length > 1 ? ` + ${cap.examples.length - 1} more` : ''}${c.reset}`)
+
+    if (showEnrichment && cap.enrichment) {
+      const approved = cap.enrichment.human_approved ? `${c.green}approved${c.reset}` : `${c.yellow}needs review${c.reset}`
+      console.log(`  ${c.gray}enrichment:${c.reset} ${cap.enrichment.confidence}% confidence · ${approved}`)
+      console.log(`  ${c.gray}labels:${c.reset} ${cap.enrichment.intent_labels.slice(0, 3).join(' | ')}`)
+    }
+
+    if (cap.resolver.type === 'api') {
+      for (const ep of cap.resolver.endpoints)
+        console.log(`  ${c.gray}→ ${ep.method} ${ep.path}${c.reset}`)
+    } else if (cap.resolver.type === 'nav') {
+      console.log(`  ${c.gray}→ nav: ${cap.resolver.destination}${c.reset}`)
+    } else if (cap.resolver.type === 'hybrid') {
+      for (const ep of cap.resolver.api.endpoints)
+        console.log(`  ${c.gray}→ ${ep.method} ${ep.path}${c.reset}`)
+      console.log(`  ${c.gray}→ nav: ${cap.resolver.nav.destination}${c.reset}`)
+    }
+
+    log.blank()
+  }
+}
+
+// ─── diff ─────────────────────────────────────────────────────────────────────
+
+function cmdDiff() {
+  header('diff — Compare two manifest versions')
+
+  const { readManifest, detectDrift, formatDriftReport } = requireSrc()
+
+  const prevPath = getFlag('--prev') ?? getFlag('--from')
+  const currPath = getFlag('--curr') ?? getFlag('--to') ?? 'navgraph.manifest.json'
+
+  if (!prevPath) {
+    log.error('Provide --prev <path> for the previous manifest')
+    log.info('Example: npx navgraph diff --prev manifest.v0.json --curr navgraph.manifest.json')
+    process.exit(1)
+  }
+
+  let prev, curr
+  try {
+    prev = readManifest(prevPath)
+    curr = readManifest(currPath)
+  } catch (e) {
+    log.error(e.message)
+    process.exit(1)
+  }
+
+  const report  = detectDrift(prev, curr)
+  const formatted = formatDriftReport(report)
+
+  console.log(formatted.split('\n').map(l => '  ' + l).join('\n'))
+  console.log()
+}
+
+// ─── corpus ───────────────────────────────────────────────────────────────────
+
+function cmdCorpus() {
+  header('corpus — Analyse query patterns')
+
+  const { FileCorpusStorage, CorpusLogger } = requireSrc()
+
+  const corpusPath = getFlag('--file') ?? 'navgraph.corpus.jsonl'
+  const storage    = new FileCorpusStorage(corpusPath)
+  const count      = storage.count()
+
+  if (count === 0) {
+    log.info('No corpus entries yet.')
+    log.info('Corpus is populated automatically when ask() is used with corpus logging enabled.')
+    console.log()
+    return
+  }
+
+  // We need an app name for the logger — read from any manifest
+  const { readManifest } = requireSrc()
+  let app = 'unknown'
+  try {
+    const m = readManifest()
+    app = m.app
+  } catch {}
+
+  const logger = new CorpusLogger(app, storage)
+
+  console.log(`  ${c.bold}Corpus:${c.reset} ${count} entries`)
+  log.blank()
+
+  // Capability stats
+  const stats = logger.getCapabilityStats()
+  console.log(`  ${c.bold}Match stats by capability:${c.reset}`)
+  for (const s of stats.sort((a, b) => b.count - a.count)) {
+    const conf     = s.avg_confidence
+    const confColor = conf >= 70 ? c.green : conf >= 50 ? c.yellow : c.red
+    const llmTag   = s.llm_fallback_rate > 30 ? `  ${c.yellow}${s.llm_fallback_rate}% LLM fallback${c.reset}` : ''
+    console.log(`  ${c.gray}${s.capability_id.padEnd(35)}${c.reset} ${s.count.toString().padStart(4)} queries  ${confColor}${conf}%${c.reset} avg${llmTag}`)
+  }
+
+  // Top unmatched
+  const gaps = logger.getTopUnmatchedPatterns(8)
+  if (gaps.length > 0) {
+    log.blank()
+    console.log(`  ${c.bold}Top unmatched queries (capability gaps):${c.reset}`)
+    for (const g of gaps) {
+      console.log(`  ${c.yellow}${g.count.toString().padStart(4)}x${c.reset}  "${g.query}"`)
+    }
+    log.blank()
+    log.info('These recurring unmatched queries suggest missing capabilities.')
+    log.info('Add them to navgraph.config.js and re-generate.')
+  }
+
+  console.log()
+}
+
+// ─── help ─────────────────────────────────────────────────────────────────────
+
+function cmdHelp() {
+  header()
+  console.log(`  ${c.bold}Usage:${c.reset}  npx navgraph <command> [options]`)
+  log.blank()
+  console.log(`  ${c.bold}Commands:${c.reset}`)
+  console.log(`    ${c.teal}init${c.reset}       Create a starter navgraph.config.js`)
+  console.log(`    ${c.teal}generate${c.reset}   Generate navgraph.manifest.json from config`)
+  console.log(`    ${c.teal}enrich${c.reset}     Add AI intent labels (needs ANTHROPIC_API_KEY)`)
+  console.log(`    ${c.teal}validate${c.reset}   Validate manifest for errors and warnings`)
+  console.log(`    ${c.teal}inspect${c.reset}    Browse all capabilities in the manifest`)
+  console.log(`    ${c.teal}diff${c.reset}       Compare two manifest versions`)
+  console.log(`    ${c.teal}corpus${c.reset}     Analyse query corpus for patterns and gaps`)
+  log.blank()
+  console.log(`  ${c.bold}Options:${c.reset}`)
+  console.log(`    ${c.gray}--config     Config file path     (default: navgraph.config.js)${c.reset}`)
+  console.log(`    ${c.gray}--out        Output file path     (default: navgraph.manifest.json)${c.reset}`)
+  console.log(`    ${c.gray}--manifest   Manifest to read     (default: navgraph.manifest.json)${c.reset}`)
+  console.log(`    ${c.gray}--prev       Previous manifest    (for diff command)${c.reset}`)
+  console.log(`    ${c.gray}--verbose    Verbose output${c.reset}`)
+  log.blank()
+  console.log(`  ${c.bold}Examples:${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph init${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph generate${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph enrich${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph diff --prev manifest.old.json${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph inspect --show-enrichment${c.reset}`)
+  console.log(`    ${c.gray}npx navgraph corpus${c.reset}`)
+  console.log()
+}
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
+switch (command) {
+  case 'init':      cmdInit();               break
+  case 'generate':  cmdGenerate();           break
+  case 'enrich':    cmdEnrich().catch(e => { log.error(e.message); process.exit(1) }); break
+  case 'validate':  cmdValidate();           break
+  case 'inspect':   cmdInspect();            break
+  case 'diff':      cmdDiff();               break
+  case 'corpus':    cmdCorpus();             break
+  case undefined:
+  case '--help':
+  case '-h':        cmdHelp();               break
+  default:
+    header()
+    log.error(`Unknown command: ${command}`)
+    console.log(`  Run: npx navgraph --help\n`)
+    process.exit(1)
+}
