@@ -1,0 +1,56 @@
+navgraph/
+├── src/
+│   ├── types.ts       ← SAM — Extended type system
+│   │                     + EnrichmentMeta, CorpusEntry, DriftReport
+│   │                     + CapabilityParam.source (from Marcus, kept)
+│   │                     + PrivacyScope.rate_limit (new)
+│   │                     + MatchResult.matchedBy (new)
+│   │
+│   ├── generator.ts   ← JORDAN — Config → Manifest + AI Enrichment
+│   │                     + enrich() pipeline with LLM per capability
+│   │                     + Content hash for drift detection
+│   │                     + Backward compat with capman configs
+│   │                     + Teaching validator with coaching messages
+│   │
+│   ├── matcher.ts     ← PRIYA — Three-tier cascade
+│   │                     Tier 1: Enriched keyword (examples 50%, labels 20%,
+│   │                             description 20%, name 10%)
+│   │                     Tier 2: LLM fallback (any provider)
+│   │                     Tier 3: Clean out_of_scope — no wandering
+│   │                     + matchedBy field on every result
+│   │                     + Basic param extraction from query text
+│   │
+│   ├── resolver.ts    ← PRIYA — Execution layer
+│   │                     + Privacy enforcement before execution
+│   │                     + Auth token forwarding for user_owned
+│   │                     + Explicit dryRun flag on ResolveResult
+│   │                     + Parallel hybrid (api + nav simultaneously)
+│   │                     + Skips session/context params in URL building
+│   │
+│   ├── drift.ts       ← JORDAN — Manifest diff engine
+│   │                     + detectDrift(prev, curr) → DriftReport
+│   │                     + Added / removed / modified detection
+│   │                     + Semantic severity: low / medium / high
+│   │                     + formatDriftReport() for CLI output
+│   │
+│   ├── corpus.ts      ← SAM — Cross-app intent corpus
+│   │                     + CorpusLogger.log() per query
+│   │                     + getUnmatched() → capability gap discovery
+│   │                     + getTopUnmatchedPatterns() → ranked gaps
+│   │                     + getCapabilityStats() → LLM fallback rates
+│   │                     + FileCorpusStorage + MemoryCorpusStorage
+│   │
+│   └── index.ts       ← JORDAN — Public API
+│                         + ask() — match + resolve in one call
+│                         + Full re-exports of all modules
+│                         + AskOptions with llm + authToken + dryRun
+│
+├── bin/
+│   └── navgraph.js    ← JORDAN — Full CLI
+│                         init / generate / enrich / validate /
+│                         inspect / diff / corpus
+│
+└── test/
+    └── test-navgraph.ts  ← ALL — 30 test cases
+                              Validation, keyword matching,
+                              resolver, ask(), drift, corpus
