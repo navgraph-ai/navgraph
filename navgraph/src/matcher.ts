@@ -125,10 +125,15 @@ export async function matchWithLLM(
   query: string, manifest: Manifest, options: LLMMatcherOptions
 ): Promise<MatchResult> {
   const summary = manifest.capabilities.map(c => {
-    const labels   = c.enrichment?.intent_labels?.length ? `\n  labels: ${c.enrichment.intent_labels.slice(0, 3).join(', ')}` : ''
-    const examples = c.examples?.length ? `\n  examples: ${c.examples.slice(0, 2).join(', ')}` : ''
-    return `- ${c.id} (${c.resolver.type}, ${c.privacy.level}): ${c.description}${examples}${labels}`
-  }).join('\n')
+    const examples = c.examples?.slice(0, 2).join(', ') ?? ''
+    const labels   = c.enrichment?.intent_labels?.slice(0, 3).join(', ') ?? ''
+    return [
+      `- ${c.id} (${c.resolver.type}, ${c.privacy.level})`,
+      `  desc: ${c.description.slice(0, 100)}`,
+      examples ? `  e.g.: ${examples}` : '',
+      labels   ? `  also: ${labels}`   : '',
+    ].filter(Boolean).join('\n')
+  }).join('\n\n')
 
   const prompt = `You are an intent matcher for NavGraph.
 App: ${manifest.app}
