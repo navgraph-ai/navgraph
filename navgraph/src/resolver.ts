@@ -1,12 +1,4 @@
-import type { MatchResult, ResolveResult, ApiResolver, NavResolver, Capability } from './types'
-
-export interface ResolveOptions {
-  baseUrl?:        string
-  authToken?:      string
-  fetch?:          typeof globalThis.fetch
-  dryRun?:         boolean
-  adminValidator?: (token: string) => Promise<boolean>
-}
+import type { MatchResult, ResolveResult, ApiResolver, NavResolver, Capability, ResolveOptions } from './types'
 
 export async function resolve(
   matchResult: MatchResult,
@@ -80,24 +72,23 @@ async function resolveApi(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (options.authToken) headers['Authorization'] = `Bearer ${options.authToken}`
 
-const responses = await Promise.all(
-  apiCalls.map(c => fetchFn(c.url, { method: c.method, headers }))
-)
+  const responses = await Promise.all(                 // ← 2 spaces now
+    apiCalls.map(c => fetchFn(c.url, { method: c.method, headers }))
+  )
 
-const failed = responses.find(r => !r.ok)
-if (failed) {
-  return {
-    success:      false,
-    resolverType: 'api',
-    apiCalls,
-    error:        `API call failed with status ${failed.status}: ${failed.statusText}`,
-    dryRun:       false,
+  const failed = responses.find(r => !r.ok)            // ← 2 spaces now
+  if (failed) {                                        // ← 2 spaces now
+    return {                                           // ← 4 spaces now
+      success:      false,
+      resolverType: 'api',
+      apiCalls,
+      error:        `API call failed with status ${failed.status}: ${failed.statusText}`,
+      dryRun:       false,
+    }
   }
-}
 
-return { success: true, resolverType: 'api', apiCalls, dryRun: false }
+  return { success: true, resolverType: 'api', apiCalls, dryRun: false }  // ← 2 spaces now
 }
-
 function resolveNav(
   resolver: NavResolver | Omit<NavResolver, 'type'>,
   params: Record<string, unknown>, dryRun: boolean

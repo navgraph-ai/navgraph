@@ -61,7 +61,7 @@ export type { LLMMatcherOptions } from './matcher'
 // ─── Resolver Exports ─────────────────────────────────────────────────────────
 
 export { resolve } from './resolver'
-export type { ResolveOptions } from './resolver'
+export type { ResolveOptions } from './types' 
 
 // ─── Drift Exports ────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ import { matchCascade }        from './matcher'
 import { resolve as _resolve } from './resolver'
 import type { Manifest, AskResult } from './types'
 import type { LLMMatcherOptions }   from './matcher'
-import type { ResolveOptions }      from './resolver'
+import type { ResolveOptions }      from './types'
 
 export interface AskOptions extends ResolveOptions {
   /** Optional LLM function. If omitted, only keyword matching is used. */

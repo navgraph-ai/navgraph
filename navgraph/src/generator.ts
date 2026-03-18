@@ -101,7 +101,22 @@ function hashCapabilities(capabilities: Capability[]): string {
     .join('|')
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
-
+/**
+ * Load the navgraph config file from disk.
+ *
+ * Searches for navgraph.config.js, navgraph.config.json, or capman.config.js
+ * in the current working directory, or at the explicitly provided path.
+ *
+ * ⚠️  ASYNC — this function returns a Promise. Always await it:
+ *
+ *   const config = await loadConfig()
+ *   const manifest = generate(config)
+ *
+ * This changed from synchronous in v1.0.0 to async in v1.0.1 to support
+ * ESM projects (type: "module" in package.json). Any caller that does not
+ * await this will receive a Promise object instead of a NavGraphConfig,
+ * causing generate() to fail silently with wrong types.
+ */
 export async function loadConfig(configPath?: string): Promise<NavGraphConfig> {
   const candidates = configPath
     ? [configPath]
