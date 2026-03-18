@@ -136,3 +136,17 @@ export interface ValidationResult {
   errors:   string[]
   warnings: string[]
 }
+
+export interface ResolveOptions {
+  baseUrl?:    string
+  authToken?:  string
+  /**
+   * Optional validator for admin-scoped capabilities.
+   * If provided, called before resolving admin capabilities.
+   * Should throw or return false if the token lacks admin privileges.
+   * Without this, admin scope only checks that a token exists.
+   */
+  adminValidator?: (token: string) => boolean | Promise<boolean>
+  fetch?:      typeof globalThis.fetch
+  dryRun?:     boolean
+}

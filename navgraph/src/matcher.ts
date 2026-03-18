@@ -69,7 +69,7 @@ function resolverToIntent(cap: Capability): MatchResult['intent'] {
 
 function extractParams(query: string, cap: Capability): Record<string, string | null> {
   const result: Record<string, string | null> = {}
-  for (const param of cap.params) {
+  for (const param of cap.params ?? [] ) {
     if (param.source === 'session')  { result[param.name] = '[from_session]';  continue }
     if (param.source === 'context')  { result[param.name] = '[from_context]';  continue }
     if (param.source === 'static')   { result[param.name] = String(param.default ?? ''); continue }

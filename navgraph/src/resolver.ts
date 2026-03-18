@@ -1,10 +1,11 @@
 import type { MatchResult, ResolveResult, ApiResolver, NavResolver, Capability } from './types'
 
 export interface ResolveOptions {
-  baseUrl?:   string
-  authToken?: string
-  fetch?:     typeof globalThis.fetch
-  dryRun?:    boolean
+  baseUrl?:        string
+  authToken?:      string
+  fetch?:          typeof globalThis.fetch
+  dryRun?:         boolean
+  adminValidator?: (token: string) => Promise<boolean>
 }
 
 export async function resolve(
@@ -18,7 +19,7 @@ export async function resolve(
     return { success: false, resolverType: null, error: 'No capability matched — cannot resolve.', dryRun: options.dryRun ?? false }
   }
 
-  const privacyError = enforcePrivacy(capability, options)
+  const privacyError = await enforcePrivacy(capability, options)
   if (privacyError) return { success: false, resolverType: capability.resolver.type, error: privacyError, dryRun: options.dryRun ?? false }
 
   const mergedParams = { ...matchResult.extractedParams, ...params }
@@ -41,12 +42,23 @@ export async function resolve(
   }
 }
 
-function enforcePrivacy(cap: Capability, options: ResolveOptions): string | null {
+async function enforcePrivacy(cap: Capability, options: ResolveOptions): Promise<string | null> {
   if (cap.privacy.level === 'public') return null
+
   if (cap.privacy.level === 'user_owned' && !options.authToken)
     return `Capability "${cap.id}" requires authentication (user_owned). Provide authToken.`
-  if (cap.privacy.level === 'admin' && !options.authToken)
-    return `Capability "${cap.id}" is admin-scoped and requires an admin auth token.`
+
+  if (cap.privacy.level === 'admin') {
+    if (!options.authToken)
+      return `Capability "${cap.id}" requires an auth token.`
+    if (options.adminValidator) {
+      const isAdmin = await options.adminValidator(options.authToken)
+      if (!isAdmin)
+        return `Capability "${cap.id}" requires admin privileges.`
+    }
+    // Note: without adminValidator, only token presence is checked.
+  }
+
   return null
 }
 
@@ -68,8 +80,22 @@ async function resolveApi(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (options.authToken) headers['Authorization'] = `Bearer ${options.authToken}`
 
-  await Promise.all(apiCalls.map(c => fetchFn(c.url, { method: c.method, headers })))
-  return { success: true, resolverType: 'api', apiCalls, dryRun: false }
+const responses = await Promise.all(
+  apiCalls.map(c => fetchFn(c.url, { method: c.method, headers }))
+)
+
+const failed = responses.find(r => !r.ok)
+if (failed) {
+  return {
+    success:      false,
+    resolverType: 'api',
+    apiCalls,
+    error:        `API call failed with status ${failed.status}: ${failed.statusText}`,
+    dryRun:       false,
+  }
+}
+
+return { success: true, resolverType: 'api', apiCalls, dryRun: false }
 }
 
 function resolveNav(
