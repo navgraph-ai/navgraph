@@ -1,0 +1,85 @@
+// BEFORE — fire-and-forget async, sections print before results
+function test(name: string, fn: () => void | Promise<void>): void {
+  const p = Promise.resolve().then(fn).then(...)
+  tests.push(p)
+}
+
+// AFTER — sequential, clean output
+async function runTests() {
+  for (const { name, fn, section } of tests) {
+    if (section) console.log(`\n  ── ${section} ${'─'.repeat(46 - section.length)}\n`)
+    try {
+      await fn()
+      console.log(`  \x1b[32m✓\x1b[0m  ${name}`)
+      pass.push(name)
+    } catch(err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m  ${name}`)
+      console.log(`     \x1b[31m${err.message}\x1b[0m`)
+      fail.push(name)
+    }
+  }
+}
+```
+
+---
+
+## 📬 The Reply to Marcus
+
+*Jordan types while Priya applies the fixes.*
+```
+Jordan → Marcus
+
+  Read every word. Both parts.
+
+  You're right about the repo — the outer
+  monorepo shell is capman's Replit environment,
+  not our product. We're cleaning the repo to
+  just the engine + CLI.
+
+  On the code review:
+  10 findings. 3 bugs, 4 issues, 3 suggestions.
+  All 10 addressed on a branch right now.
+
+  The ESM one would have killed adoption.
+  The HTTP error swallowing would have caused
+  silent failures nobody could debug.
+  The mutation bug is the subtlest — shallow
+  spread hiding a shared reference.
+
+  6.8 is fair. The engine is solid.
+  The execution has gaps. We'll close them.
+
+  Thank you for reading it properly.
+```
+
+*Three minutes.*
+```
+Marcus → Jordan
+
+  That's the right response to a code review.
+  No defensiveness. Just fixes.
+
+  The ESM bug — I nearly shipped that same thing
+  in capman. Caught it at the last minute.
+  Dynamic import is the only safe path now.
+
+  When the branch is clean, tag v1.0.1.
+  Don't let bugs sit on main.
+```
+
+---
+
+*Priya pushes the branch. The PR shows ten changed files.*
+```
+fix/marcus-review
+
+  src/matcher.ts    — null guard, scoring weight fix, LLM prompt trim
+  src/resolver.ts   — HTTP error handling, adminValidator option
+  src/generator.ts  — enrichment mutation fix, ESM-safe loadConfig
+  src/corpus.ts     — O(1) count with in-memory counter
+  src/drift.ts      — content-aware hash
+  src/types.ts      — adminValidator in ResolveOptions
+  test/test-navgraph.ts — sequential runner
+
+  10 findings addressed.
+  All tests passing.
