@@ -89,6 +89,7 @@ async function resolveApi(
 
   return { success: true, resolverType: 'api', apiCalls, dryRun: false }  // ← 2 spaces now
 }
+
 function resolveNav(
   resolver: NavResolver | Omit<NavResolver, 'type'>,
   params: Record<string, unknown>, dryRun: boolean

@@ -33,9 +33,10 @@ function scoreCapability(query: string, cap: Capability): number {
       best = Math.max(best, (overlap / lWords.length) * 100)
     }
     score += best * 0.20
-  } else {
-    // No enrichment — redistribute 20% back to examples
+  }  else {
+    // No enrichment labels — redistribute 20% weight
     if (examples.length > 0) {
+      // Has examples: score them again at 20%
       let best = 0
       for (const ex of examples) {
         const exWords = tokenize(ex)
@@ -43,6 +44,12 @@ function scoreCapability(query: string, cap: Capability): number {
         best = Math.max(best, (overlap / exWords.length) * 100)
       }
       score += best * 0.20
+    } else {
+      // No examples either — give 20% to description instead
+      // so description-only capabilities can still reach threshold
+      const descWords2   = tokenize(cap.description)
+      const descOverlap2 = descWords2.filter(w => qWords.includes(w)).length
+      score += (descOverlap2 / Math.max(descWords2.length, 1)) * 100 * 0.20
     }
   }
 

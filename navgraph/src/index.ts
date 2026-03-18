@@ -61,7 +61,7 @@ export type { LLMMatcherOptions } from './matcher'
 // ─── Resolver Exports ─────────────────────────────────────────────────────────
 
 export { resolve } from './resolver'
-export type { ResolveOptions } from './types' 
+export type { ResolveOptions } from './types'
 
 // ─── Drift Exports ────────────────────────────────────────────────────────────
 

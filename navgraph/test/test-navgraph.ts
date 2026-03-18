@@ -138,7 +138,6 @@ const conduitConfig: NavGraphConfig = {
 
 const pass:  string[] = []
 const fail:  string[] = []
-const skip:  string[] = []
 
 type TestCase = { name: string; fn: () => void | Promise<void>; section?: string }
 const tests: TestCase[] = []

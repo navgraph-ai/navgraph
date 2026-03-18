@@ -101,6 +101,7 @@ function hashCapabilities(capabilities: Capability[]): string {
     .join('|')
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
+
 /**
  * Load the navgraph config file from disk.
  *

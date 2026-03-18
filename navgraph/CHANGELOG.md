@@ -59,31 +59,3 @@ const manifest = generate(config)
 
 The CLI (`bin/navgraph.js`) is already updated.
 If you call `loadConfig` directly in your own code, add `await`.
-```
-
----
-
-## Summary of Every Change
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FILE                    ACTION        LINES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-src/generator.ts        ADD           16 lines of JSDoc
-                                      inserted above line 105
-                                      (currently blank line 104)
-
-bin/navgraph.js         NOTHING       already correct
-                                      line 106: async function
-                                      line 117: await loadConfig()
-                                      verified, do not touch
-
-src/index.ts            NOTHING       line 36 is a re-export,
-                                      not a call — do not touch
-
-CHANGELOG.md            CREATE NEW    new file at navgraph/
-                                      documents breaking change
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total lines added:  ~50 (all documentation)
-Total lines changed: 0
-Total lines removed: 0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
