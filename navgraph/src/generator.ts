@@ -88,8 +88,16 @@ Respond ONLY in valid JSON:
 }
 
 function hashCapabilities(capabilities: Capability[]): string {
-  const ids = capabilities.map(c => c.id).sort().join(',')
-  return crypto.createHash('sha256').update(ids).digest('hex').slice(0, 16)
+  const content = capabilities
+    .map(c => [
+      c.id,
+      c.resolver.type,
+      c.privacy.level,
+      c.description.slice(0, 64),
+    ].join(':'))
+    .sort()
+    .join('|')
+  return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
 export function loadConfig(configPath?: string): NavGraphConfig {
