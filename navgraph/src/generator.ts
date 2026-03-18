@@ -3,7 +3,7 @@ import * as path   from 'path'
 import * as crypto from 'crypto'
 import type {
   NavGraphConfig, Manifest, Capability,
-  EnrichmentMeta, ValidationResult,
+  EnrichmentMeta, ValidationResult, PrivacyScope,
 } from './types'
 
 export function generate(config: NavGraphConfig): Manifest {
@@ -33,8 +33,8 @@ export async function enrich(
     }
     if (verbose) console.log(`[navgraph] enriching "${cap.id}"...`)
     try {
-      const meta = await enrichCapability(cap, llm, model)
-      enriched.push({ ...cap, enrichment: meta })
+      const { meta, privacy } = await enrichCapability(cap, llm, model)
+      enriched.push({ ...cap, privacy, enrichment: meta })
     } catch (err) {
       console.warn(`[navgraph] enrichment failed for "${cap.id}":`, err)
       enriched.push(cap)
@@ -48,7 +48,7 @@ async function enrichCapability(
   cap: Capability,
   llm: (prompt: string) => Promise<string>,
   model: string
-): Promise<EnrichmentMeta> {
+): Promise<{ meta: EnrichmentMeta; privacy: PrivacyScope }> {
   const prompt = `You are a capability enrichment engine for NavGraph.
 
 Capability:
@@ -73,11 +73,11 @@ Respond ONLY in valid JSON:
   const clean  = raw.replace(/```json|```/g, '').trim()
   const parsed = JSON.parse(clean)
 
-  if (parsed.rate_limit_detected) {
-    cap.privacy.rate_limit = parsed.rate_limit_detected
-  }
+  const privacy: PrivacyScope = parsed.rate_limit_detected
+    ? { ...cap.privacy, rate_limit: parsed.rate_limit_detected }
+    : cap.privacy
 
-  return {
+  const meta: EnrichmentMeta = {
     intent_labels:  parsed.intent_labels  ?? [],
     confidence:     parsed.confidence     ?? 70,
     reasoning:      parsed.reasoning      ?? '',
@@ -85,6 +85,8 @@ Respond ONLY in valid JSON:
     enriched_by:    model,
     human_approved: false,
   }
+
+  return { meta, privacy }
 }
 
 function hashCapabilities(capabilities: Capability[]): string {
@@ -100,14 +102,24 @@ function hashCapabilities(capabilities: Capability[]): string {
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16)
 }
 
-export function loadConfig(configPath?: string): NavGraphConfig {
+export async function loadConfig(configPath?: string): Promise<NavGraphConfig> {
   const candidates = configPath
     ? [configPath]
     : ['navgraph.config.js', 'navgraph.config.json', 'capman.config.js']
 
   for (const candidate of candidates) {
     const resolved = path.resolve(process.cwd(), candidate)
-    if (fs.existsSync(resolved)) {
+    if (!fs.existsSync(resolved)) continue
+
+    if (candidate.endsWith('.json')) {
+      const mod = require(resolved)
+      return mod.default ?? mod
+    }
+
+    try {
+      const mod = await import(resolved)
+      return mod.default ?? mod
+    } catch {
       const mod = require(resolved)
       return mod.default ?? mod
     }

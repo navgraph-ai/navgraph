@@ -103,7 +103,7 @@ function cmdInit() {
 
 // ─── generate ─────────────────────────────────────────────────────────────────
 
-function cmdGenerate() {
+async function cmdGenerate() {
   header('generate — Build manifest from config')
 
   const { loadConfig, generate, writeManifest, validate } = requireSrc()
@@ -114,7 +114,7 @@ function cmdGenerate() {
   log.info('Loading config...')
   let config
   try {
-    config = loadConfig(configPath)
+    config = await loadConfig(configPath)
   } catch (e) {
     log.error(e.message)
     process.exit(1)
@@ -465,7 +465,7 @@ function cmdHelp() {
 
 switch (command) {
   case 'init':      cmdInit();               break
-  case 'generate':  cmdGenerate();           break
+  case 'generate':  cmdGenerate().catch(e => { log.error(e.message); process.exit(1) }); break
   case 'enrich':    cmdEnrich().catch(e => { log.error(e.message); process.exit(1) }); break
   case 'validate':  cmdValidate();           break
   case 'inspect':   cmdInspect();            break

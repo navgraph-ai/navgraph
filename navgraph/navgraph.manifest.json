@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "app": "your-app-name",
-  "generatedAt": "2026-03-17T10:02:18.525Z",
+  "generatedAt": "2026-03-18T10:50:17.351Z",
   "capabilities": [
     {
       "id": "get_resource",
@@ -34,23 +34,8 @@
       },
       "privacy": {
         "level": "public"
-      },
-      "enrichment": {
-        "intent_labels": [
-          "Retrieve the resource details",
-          "Get me information about this resource",
-          "Fetch the resource by its identifier",
-          "What are the properties of this resource",
-          "Pull up the resource data"
-        ],
-        "confidence": 92,
-        "reasoning": "These phrasings capture common user patterns for resource retrieval across direct commands, informational requests, and data lookup operations.",
-        "enriched_at": "2026-03-17T10:09:38.447Z",
-        "enriched_by": "navgraph-enricher",
-        "human_approved": false
       }
     }
   ],
-  "contentHash": "74526e2e45133826",
-  "enrichedAt": "2026-03-17T10:09:38.476Z"
+  "contentHash": "66a931926e96df69"
 }
