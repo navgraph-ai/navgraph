@@ -140,29 +140,41 @@ const pass:  string[] = []
 const fail:  string[] = []
 const skip:  string[] = []
 
+type TestCase = { name: string; fn: () => void | Promise<void>; section?: string }
+const tests: TestCase[] = []
+let pendingSection: string | undefined
+
+function section(name: string): void {
+  pendingSection = name
+}
+
 function test(name: string, fn: () => void | Promise<void>): void {
-  const p = Promise.resolve().then(fn)
-    .then(() => {
-      console.log(`  ${'\x1b[32m'}✓${'\x1b[0m'}  ${name}`)
-      pass.push(name)
-    })
-    .catch((err) => {
-      console.log(`  ${'\x1b[31m'}✗${'\x1b[0m'}  ${name}`)
-      console.log(`     ${'\x1b[31m'}${err.message}${'\x1b[0m'}`)
-      fail.push(name)
-    })
-  tests.push(p)
+  tests.push({ name, fn, section: pendingSection })
+  pendingSection = undefined
 }
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message)
 }
 
-const tests: Promise<void>[] = []
+async function runTests(): Promise<void> {
+  for (const { name, fn, section } of tests) {
+    if (section) console.log(`\n  ── ${section} ${'─'.repeat(46 - section.length)}\n`)
+    try {
+      await fn()
+      console.log(`  \x1b[32m✓\x1b[0m  ${name}`)
+      pass.push(name)
+    } catch (err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m  ${name}`)
+      console.log(`     \x1b[31m${err.message}\x1b[0m`)
+      fail.push(name)
+    }
+  }
+}
 
 // ─── Section: Validation ──────────────────────────────────────────────────────
 
-console.log('\n  ── Validation ─────────────────────────────────────────────\n')
+section('Validation')
 
 test('manifest validates without errors', () => {
   const manifest = generate(conduitConfig)
@@ -190,7 +202,7 @@ test('invalid manifest fails validation', () => {
 
 // ─── Section: Keyword Matching ────────────────────────────────────────────────
 
-console.log('\n  ── Keyword Matcher ────────────────────────────────────────\n')
+section('Keyword Matcher')
 
 const manifest = generate(conduitConfig)
 
@@ -246,7 +258,7 @@ test('matched result has correct matchedBy field', () => {
 
 // ─── Section: Resolver ────────────────────────────────────────────────────────
 
-console.log('\n  ── Resolver ───────────────────────────────────────────────\n')
+section('Resolver')
 
 test('API capability resolves in dry-run', async () => {
   const matchResult = match('Show me the latest articles', manifest)
@@ -303,7 +315,7 @@ test('user_owned capability with auth token succeeds', async () => {
 
 // ─── Section: ask() convenience ───────────────────────────────────────────────
 
-console.log('\n  ── ask() convenience ──────────────────────────────────────\n')
+section('ask() convenience')
 
 test('ask() returns match + resolution in one call', async () => {
   const result = await ask('What tags are popular?', manifest, { dryRun: true })
@@ -319,7 +331,7 @@ test('ask() handles out_of_scope cleanly', async () => {
 
 // ─── Section: Drift Detection ─────────────────────────────────────────────────
 
-console.log('\n  ── Drift Detection ────────────────────────────────────────\n')
+section('Drift Detection')
 
 test('no drift when manifests are identical', () => {
   const m1 = generate(conduitConfig)
@@ -381,7 +393,7 @@ test('formatDriftReport produces readable output', () => {
 
 // ─── Section: Corpus ──────────────────────────────────────────────────────────
 
-console.log('\n  ── Corpus ─────────────────────────────────────────────────\n')
+section('Corpus')
 
 test('corpus logger records entries', () => {
   const storage = new MemoryCorpusStorage()
@@ -420,7 +432,7 @@ test('corpus stats show correct capability counts', () => {
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 
-Promise.all(tests).then(() => {
+runTests().then(() => {
   console.log()
   console.log('  ─────────────────────────────────────────────────────────')
   console.log()
