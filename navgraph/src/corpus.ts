@@ -11,12 +11,21 @@ export interface CorpusStorage {
 
 export class FileCorpusStorage implements CorpusStorage {
   private filePath: string
+  private _count:   number = 0
+
   constructor(filePath = 'navgraph.corpus.jsonl') {
     this.filePath = path.resolve(process.cwd(), filePath)
+    if (fs.existsSync(this.filePath)) {
+      this._count = fs.readFileSync(this.filePath, 'utf-8')
+        .split('\n').filter(Boolean).length
+    }
   }
+
   append(entry: CorpusEntry): void {
     fs.appendFileSync(this.filePath, JSON.stringify(entry) + '\n', 'utf-8')
+    this._count++
   }
+
   query(filter?: Partial<CorpusEntry>): CorpusEntry[] {
     if (!fs.existsSync(this.filePath)) return []
     const all = fs.readFileSync(this.filePath, 'utf-8').split('\n').filter(Boolean)
@@ -25,9 +34,9 @@ export class FileCorpusStorage implements CorpusStorage {
     if (!filter) return all
     return all.filter(e => Object.entries(filter).every(([k, v]) => e[k as keyof CorpusEntry] === v))
   }
+
   count(): number {
-    if (!fs.existsSync(this.filePath)) return 0
-    return fs.readFileSync(this.filePath, 'utf-8').split('\n').filter(Boolean).length
+    return this._count
   }
 }
 
